@@ -10,7 +10,7 @@ function App() {
     <>
       <div>{app}</div>
       {AuthUrl}
-      This is the main branch code
+      This is the UAT branch code
     </>
   )
 }
