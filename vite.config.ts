@@ -6,6 +6,6 @@ export default defineConfig({
   preview: {
     host: true,
     port: 4173,
-    allowedHosts: ['envdocker-dev.onrender.com']
+    allowedHosts: true
   }
 })
