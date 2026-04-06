@@ -24,11 +24,13 @@ jobs:
         id: env
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "IMAGE_TAG=dev" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=prod" >> $GITHUB_OUTPUT
           elif [[ "${GITHUB_REF##*/}" == "uat" ]]; then
-            echo "IMAGE_TAG=uat" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=uat" >> $GITHUB_OUTPUT
+          elif [[ "${GITHUB_REF##*/}" == "dev" ]]; then
+          echo "IMAGE_TAG=dev" >> $GITHUB_OUTPUT
           else
-            echo "IMAGE_TAG=local" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=local" >> $GITHUB_OUTPUT
           fi
 
       # 3. Login Docker Hub
