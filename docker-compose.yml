@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  local:
+    build:
+      context: .
+      args:
+        ENV_FILE: .env.local
+    ports:
+      - "5173:5173"
+
+  dev:
+    build:
+      context: .
+      args:
+        ENV_FILE: .env.dev
+    ports:
+      - "5174:5173"
+
+  uat:
+    build:
+      context: .
+      args:
+        ENV_FILE: .env.uat
+    ports:
+      - "5175:5173"
