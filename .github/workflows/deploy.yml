@@ -11,23 +11,23 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
+    # 🔥 ADD THIS LINE
+    environment: dev
+
     steps:
       # 1. Checkout
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 2. Set ENV + Tag
+      # 2. Set Tag
       - name: Set Environment
         id: env
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "ENV_FILE=.env.dev" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=dev" >> $GITHUB_OUTPUT
           elif [[ "${GITHUB_REF##*/}" == "uat" ]]; then
-            echo "ENV_FILE=.env.uat" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=uat" >> $GITHUB_OUTPUT
           else
-            echo "ENV_FILE=.env.local" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=local" >> $GITHUB_OUTPUT
           fi
 
@@ -35,14 +35,13 @@ jobs:
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-  # 4. Build Image
+      # 4. Build Image
       - name: Build Docker Image
         run: |
           docker build \
-          --build-arg VITE_AUTH_URL=${{ secrets.VITE_AUTH_URL }} \
-          --build-arg VITE_APP=${{ secrets.VITE_APP }} \
-          -t hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} .
-
+            --build-arg VITE_AUTH_URL=${{ secrets.VITE_AUTH_URL }} \
+            --build-arg VITE_APP=${{ secrets.VITE_APP }} \
+            -t hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} .
 
       # 5. Push Image
       - name: Push Docker Image
