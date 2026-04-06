@@ -2,24 +2,20 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy all project files
 COPY . .
 
-# ❗ Remove all existing env files to avoid Vite conflicts
-RUN rm -f .env .env.* 
+# Inject env variables
+ARG VITE_AUTH_URL
+ARG VITE_APP
 
-# Accept env file as argument
-ARG ENV_FILE
+ENV VITE_AUTH_URL=$VITE_AUTH_URL
+ENV VITE_APP=$VITE_APP
 
-# Copy selected env file as .env
-COPY ${ENV_FILE} .env
+RUN npm run build
 
-# Expose Vite dev port
-EXPOSE 5173
+EXPOSE 4173
 
-# Run Vite dev server
-CMD ["npm", "run", "dev", "--", "--host"]
+CMD ["sh", "-c", "npm run preview -- --host --port $PORT"]
