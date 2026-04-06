@@ -6,20 +6,23 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy all project files
+# Copy all files
 COPY . .
 
-# ❗ Remove all existing env files to avoid Vite conflicts
-RUN rm -f .env .env.* 
+# Remove all env files (avoid conflicts)
+RUN rm -f .env .env.*
 
-# Accept env file as argument
-ARG ENV_FILE
+# Use ENV from Render dashboard
+ENV ENV_FILE=.env.dev
 
-# Copy selected env file as .env
-COPY ${ENV_FILE} .env
+# Copy selected env file
+RUN cp $ENV_FILE .env
 
-# Expose Vite dev port
-EXPOSE 5173
+# Build app
+RUN npm run build
 
-# Run Vite dev server
-CMD ["npm", "run", "dev", "--", "--host"]
+# Expose (just for reference)
+EXPOSE 4173
+
+# Start using dynamic port
+CMD ["sh", "-c", "npm run preview -- --host --port $PORT"]
