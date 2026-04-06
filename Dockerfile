@@ -9,20 +9,20 @@ RUN npm install
 # Copy all files
 COPY . .
 
-# Remove all env files (avoid conflicts)
+# Remove env conflicts
 RUN rm -f .env .env.*
 
-# Use ENV from Render dashboard
-ENV ENV_FILE=.env.dev
+# Accept env file at build time
+ARG ENV_FILE
 
 # Copy selected env file
-RUN cp $ENV_FILE .env
+COPY ${ENV_FILE} .env
 
-# Build app
+# Build the app (IMPORTANT)
 RUN npm run build
 
-# Expose (just for reference)
+# Expose port (reference only)
 EXPOSE 4173
 
-# Start using dynamic port
+# Run production server (Vite preview)
 CMD ["sh", "-c", "npm run preview -- --host --port $PORT"]
