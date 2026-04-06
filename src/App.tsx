@@ -10,7 +10,9 @@ function App() {
     <>
       <div>{app}</div>
       {AuthUrl}
-      This is the dev branch code
+      <div>
+        This is the dev branch code
+      </div>
     </>
   )
 }
