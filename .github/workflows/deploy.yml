@@ -49,13 +49,14 @@ jobs:
         run: |
           docker push hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} 2>&1 | tee -a build.log
 
-      # 6. Send Logs to Loki (IMPORTANT)
-      - name: Send Logs to Loki
+      # 6. Send Logs to Grafana Cloud ✅
+      - name: Send Logs to Grafana Cloud
         if: always()
         run: |
           LOG_CONTENT=$(cat build.log | sed 's/"/\\"/g')
 
-          curl -X POST "http://<YOUR_SERVER_IP>:3100/loki/api/v1/push" \
+          curl -u "${{ secrets.GRAFANA_USER }}:${{ secrets.GRAFANA_API_KEY }}" \
+          -X POST "${{ secrets.GRAFANA_URL }}" \
           -H "Content-Type: application/json" \
           --data-raw "{
             \"streams\": [
