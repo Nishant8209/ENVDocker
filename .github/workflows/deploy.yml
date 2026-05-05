@@ -49,27 +49,30 @@ jobs:
         run: |
           docker push hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} 2>&1 | tee -a build.log
 
-      # 6. Send Logs to Grafana Cloud ✅
+      # 6. Send Logs to Grafana Cloud
       - name: Send Logs to Grafana Cloud
         if: always()
         run: |
-          LOG_CONTENT=$(cat build.log | sed 's/"/\\"/g')
+          # Limit log size (IMPORTANT)
+          LOG_CONTENT=$(tail -n 200 build.log | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
 
-          curl -u "${{ secrets.GRAFANA_USER }}:${{ secrets.GRAFANA_API_KEY }}" \
-          -X POST "${{ secrets.GRAFANA_URL }}" \
-          -H "Content-Type: application/json" \
-          --data-raw "{
-            \"streams\": [
-              {
-                \"stream\": {
-                  \"job\": \"github-actions\",
-                  \"repo\": \"${{ github.repository }}\",
-                  \"branch\": \"${{ github.ref_name }}\",
-                  \"status\": \"${{ job.status }}\"
-                },
-                \"values\": [
-                  [\"$(date +%s%N)\", \"$LOG_CONTENT\"]
-                ]
-              }
-            ]
-          }"
+          TIMESTAMP=$(date +%s%N)
+
+          curl -v -u "${{ secrets.GRAFANA_USER }}:${{ secrets.GRAFANA_API_KEY }}" \
+            -X POST "${{ secrets.GRAFANA_URL }}" \
+            -H "Content-Type: application/json" \
+            --data-raw "{
+              \"streams\": [
+                {
+                  \"stream\": {
+                    \"job\": \"github-actions\",
+                    \"repo\": \"${{ github.repository }}\",
+                    \"branch\": \"${{ github.ref_name }}\",
+                    \"status\": \"${{ job.status }}\"
+                  },
+                  \"values\": [
+                    [\"$TIMESTAMP\", \"$LOG_CONTENT\"]
+                  ]
+                }
+              ]
+            }"
