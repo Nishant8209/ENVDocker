@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Observability
 
 on:
   push:
@@ -11,7 +11,6 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
-    # 🔥 Dynamic environment mapping
     environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
 
     steps:
@@ -24,28 +23,52 @@ jobs:
         id: env
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-          echo "IMAGE_TAG=prod" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=prod" >> $GITHUB_OUTPUT
           elif [[ "${GITHUB_REF##*/}" == "uat" ]]; then
-          echo "IMAGE_TAG=uat" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=uat" >> $GITHUB_OUTPUT
           elif [[ "${GITHUB_REF##*/}" == "dev" ]]; then
-          echo "IMAGE_TAG=dev" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=dev" >> $GITHUB_OUTPUT
           else
-          echo "IMAGE_TAG=local" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=local" >> $GITHUB_OUTPUT
           fi
 
       # 3. Login Docker Hub
       - name: Login Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      # 4. Build Docker Image
+      # 4. Build Image (capture logs)
       - name: Build Image
         run: |
           docker build \
             --build-arg VITE_AUTH_URL=${{ secrets.VITE_AUTH_URL }} \
             --build-arg VITE_APP=${{ secrets.VITE_APP }} \
-            -t hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} .
+            -t hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} . 2>&1 | tee build.log
 
-      # 5. Push Image
+      # 5. Push Image (capture logs)
       - name: Push Image
         run: |
-          docker push hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }}
+          docker push hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} 2>&1 | tee -a build.log
+
+      # 6. Send Logs to Loki (IMPORTANT)
+      - name: Send Logs to Loki
+        if: always()
+        run: |
+          LOG_CONTENT=$(cat build.log | sed 's/"/\\"/g')
+
+          curl -X POST "http://<YOUR_SERVER_IP>:3100/loki/api/v1/push" \
+          -H "Content-Type: application/json" \
+          --data-raw "{
+            \"streams\": [
+              {
+                \"stream\": {
+                  \"job\": \"github-actions\",
+                  \"repo\": \"${{ github.repository }}\",
+                  \"branch\": \"${{ github.ref_name }}\",
+                  \"status\": \"${{ job.status }}\"
+                },
+                \"values\": [
+                  [\"$(date +%s%N)\", \"$LOG_CONTENT\"]
+                ]
+              }
+            ]
+          }"
