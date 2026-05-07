@@ -1,78 +1,120 @@
-name: CI/CD Pipeline with Observability
+name: User Service CI/CD
 
 on:
   push:
     branches:
       - main
-      - uat
-      - dev
 
 jobs:
-  build-and-push:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
-    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
-
     steps:
-      # 1. Checkout
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      # 1. Checkout Repository
 
-      # 2. Set Image Tag
-      - name: Set Tag
-        id: env
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Start Timer
+
+      - name: Start Timer
+        run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+      # 3. Create Log File
+
+      - name: Create Log File
+        run: touch pipeline.log
+
+      # 4. Setup Node.js
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 5. Install Dependencies
+
+      - name: Install Dependencies
         run: |
-          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "IMAGE_TAG=prod" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "uat" ]]; then
-            echo "IMAGE_TAG=uat" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "dev" ]]; then
-            echo "IMAGE_TAG=dev" >> $GITHUB_OUTPUT
-          else
-            echo "IMAGE_TAG=local" >> $GITHUB_OUTPUT
-          fi
+          echo "===== Installing Dependencies =====" | tee -a pipeline.log
+          npm install 2>&1 | tee -a pipeline.log
 
-      # 3. Login Docker Hub
-      - name: Login Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      # 6. Run Tests
 
-      # 4. Build Image (capture logs)
-      - name: Build Image
+      - name: Run Tests
         run: |
+          echo "===== Running Tests =====" | tee -a pipeline.log
+          npm test 2>&1 | tee -a pipeline.log
+
+      # 7. Login to Docker Hub
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login \
+          -u "${{ secrets.DOCKER_USERNAME }}" \
+          --password-stdin 2>&1 | tee -a pipeline.log
+
+      # 8. Build Docker Image
+
+      - name: Build Docker Image
+        run: |
+          echo "===== Building Docker Image =====" | tee -a pipeline.log
+
           docker build \
-            --build-arg VITE_AUTH_URL=${{ secrets.VITE_AUTH_UR }} \
-            --build-arg VITE_APP=${{ secrets.VITE_APP }} \
-            -t hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} . 2>&1 | tee build.log
+            -t hari8209/user-service:latest . \
+            2>&1 | tee -a pipeline.log
 
-      # 5. Push Image (capture logs)
-      - name: Push Image
+      # 9. Push Docker Image
+
+      - name: Push Docker Image
         run: |
-          docker push hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} 2>&1 | tee -a build.log
+          echo "===== Pushing Docker Image =====" | tee -a pipeline.log
 
-      # 6. Send Logs to Grafana Cloud
+          docker push hari8209/user-service:latest \
+            2>&1 | tee -a pipeline.log
+
+      # 10. Send Logs to Grafana Cloud Loki
+
       - name: Send Logs to Grafana Cloud
         if: always()
+
         run: |
-          # Limit log size (IMPORTANT)
-          LOG_CONTENT=$(tail -n 200 build.log | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
+          echo "===== Sending Logs to Grafana Loki ====="
+
+          # Capture last 200 lines
+          LOG_CONTENT=$(tail -n 200 pipeline.log | jq -Rs .)
 
           TIMESTAMP=$(date +%s%N)
 
-          curl -v -u "${{ secrets.GRAFANA_USER }}:${{ secrets.GRAFANA_API_KEY }}" \
-            -X POST "${{ secrets.GRAFANA_URL }}" \
-            -H "Content-Type: application/json" \
-            --data-raw "{
-              \"streams\": [
-                {
-                  \"stream\": {
-                    \"job\": \"github-actions\",
-                    \"repo\": \"${{ github.repository }}\",
-                    \"branch\": \"${{ github.ref_name }}\",
-                    \"status\": \"${{ job.status }}\"
-                  },
-                  \"values\": [
-                    [\"$TIMESTAMP\", \"$LOG_CONTENT\"]
+          cat <<EOF > payload.json
+          {
+            "streams": [
+              {
+                "stream": {
+                  "job": "github-actions-user-service",
+                  "service": "user-service",
+                  "repo": "${{ github.repository }}",
+                  "branch": "${{ github.ref_name }}",
+                  "status": "${{ job.status }}"
+                },
+                "values": [
+                  [
+                    "$TIMESTAMP",
+                    $LOG_CONTENT
                   ]
-                }
-              ]
-            }"
+                ]
+              }
+            ]
+          }
+          EOF
+
+          echo "===== Loki Payload ====="
+          cat payload.json
+
+          echo "===== Sending Logs ====="
+
+          curl -v \
+            -u "${{ secrets.GRAFANA_USER }}:${{ secrets.GRAFANA_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -X POST "${{ secrets.GRAFANA_URL }}" \
+            --data-binary @payload.json
