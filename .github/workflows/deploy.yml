@@ -40,7 +40,7 @@ jobs:
       - name: Build Image
         run: |
           docker build \
-            --build-arg VITE_AUTH_URL=${{ secrets.VITE_AUTH_URL }} \
+            --build-arg VITE_AUTH_URL=${{ secrets.VITE_AUTH_UR }} \
             --build-arg VITE_APP=${{ secrets.VITE_APP }} \
             -t hari8209/envdocker:${{ steps.env.outputs.IMAGE_TAG }} . 2>&1 | tee build.log
 
