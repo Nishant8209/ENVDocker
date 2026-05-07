@@ -4,7 +4,7 @@ import './App.css'
 const app = import.meta.env.VITE_APP;
 
 const AuthUrl = import.meta.env.VITE_AUTH_URL;
-
+const test=()=>{}
 
 export interface IProduct {
   _id: number;
